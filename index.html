@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GAME ON PHOTO EDITOR</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background-color: #111;
+    color: white;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: flex-start;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    overflow: hidden;
+}
+#controls {
+    width: 30%;
+    max-width: 400px;
+    padding: 1rem;
+    background: #1a1a1a;
+    border-right: 2px solid #333;
+    box-sizing: border-box;
+    overflow-y: auto;
+    max-height: 100vh;
+}
+#preview-container {
+    width: 70%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #000;
+    overflow: hidden;
+
+    /* Border container */
+    border: 3px solid #666;
+    border-radius: 10px;
+    padding: 20px;
+    box-sizing: border-box;
+}
+canvas {
+    width: 100%;
+    height: auto;
+    max-height: 90vh;
+    border: 2px solid #444;
+    border-radius: 8px;
+    background: black;
+}
+input, select, button {
+    width: 100%;
+    margin-bottom: 0.5rem;
+    padding: 0.4rem;
+    background: #222;
+    color: white;
+    border: 1px solid #444;
+    border-radius: 4px;
+}
+label {
+    font-size: 0.9rem;
+    color: #ccc;
+}
+h2 {
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 2rem;
+}
+button {
+    cursor: pointer;
+    background: #333;
+}
+button:hover { background: #444; }
+.item-container {
+    margin-bottom: 0.5rem;
+}
+</style>
+</head>
+<body>
+<div id="controls">
+    <h2>GAME ON PHOTO EDITOR</h2>
+    
+    <label>Logo Image</label>
+    <input type="file" id="logoInput" accept="image/*"><br>
+    
+    <label>Logo Size</label>
+    <select id="logoSize">
+        <option value="small">Small</option>
+        <option value="medium" selected>Medium</option>
+        <option value="large">Large</option>
+    </select><br>
+    
+    <label>Background Image</label>
+    <input type="file" id="bgInput" accept="image/*"><br>
+    
+    <label>Headline Text</label>
+    <input type="text" id="headlineText" placeholder="Enter headline...">
+    
+    <label>Font</label>
+    <select id="fontSelect">
+        <option>Impact</option>
+        <option>Montserrat</option>
+        <option>Roboto</option>
+        <option>Arial</option>
+        <option>Times New Roman</option>
+    </select>
+    
+    <label>Headline Size</label>
+    <input type="number" id="headlineSize" value="60" min="10" max="200">
+    <input type="range" id="headlineSizeSlider" min="10" max="200" value="60">
+    
+    <label>Text Color</label>
+    <input type="color" id="textColor" value="#ffffff">
+    
+    <label>Background Color</label>
+    <input type="color" id="bgColor" value="#000000">
+
+    <h3>Product Items Settings</h3>
+    <label>Item Font Size</label>
+    <input type="number" id="itemSize" value="36" min="10" max="200">
+    <input type="range" id="itemSizeSlider" min="10" max="200" value="36">
+    <label>Item Text Color</label>
+    <input type="color" id="itemColor" value="#ffffff">
+
+    <h3>Product Items</h3>
+    <div id="items"></div>
+    <button id="addItem">Add Item</button>
+    <button id="render">Render Preview</button>
+    <button id="download">Download PNG</button>
+</div>
+
+<div id="preview-container">
+    <canvas id="billboard" width="1200" height="630"></canvas>
+</div>
+
+<script>
+const canvas = document.getElementById('billboard');
+const ctx = canvas.getContext('2d');
+
+const itemsDiv = document.getElementById('items');
+const bgInput = document.getElementById('bgInput');
+const logoInput = document.getElementById('logoInput');
+const renderBtn = document.getElementById('render');
+const downloadBtn = document.getElementById('download');
+
+const headlineSizeInput = document.getElementById('headlineSize');
+const headlineSizeSlider = document.getElementById('headlineSizeSlider');
+
+const itemSizeInput = document.getElementById('itemSize');
+const itemSizeSlider = document.getElementById('itemSizeSlider');
+const itemColorInput = document.getElementById('itemColor');
+
+let bgImage = null, logoImage = null;
+const canvasPadding = 40; // NEW: padding inside canvas
+
+// Load images
+bgInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if(file){
+        const img = new Image();
+        img.onload = () => { bgImage = img; drawBillboard(); };
+        img.src = URL.createObjectURL(file);
+    }
+});
+logoInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if(file){
+        const img = new Image();
+        img.onload = () => { logoImage = img; drawBillboard(); };
+        img.src = URL.createObjectURL(file);
+    }
+});
+
+// Add item
+document.getElementById('addItem').onclick = () => {
+    const div = document.createElement('div');
+    div.classList.add('item-container');
+    div.innerHTML = `
+        <input type="text" placeholder="Item name" class="itemName">
+        <input type="text" placeholder="Price" class="itemPrice">
+    `;
+    itemsDiv.appendChild(div);
+
+    div.querySelectorAll('input').forEach(input => {
+        input.addEventListener('input', drawBillboard);
+        input.addEventListener('change', drawBillboard);
+    });
+};
+
+// Draw billboard
+function drawBillboard() {
+    const headlineText = document.getElementById('headlineText').value;
+    const font = document.getElementById('fontSelect').value;
+    let headlineSize = parseInt(headlineSizeInput.value); // allow resizing
+    const headlineColor = document.getElementById('textColor').value;
+    const bgColor = document.getElementById('bgColor').value;
+    const logoSizeOption = document.getElementById('logoSize').value;
+
+    const itemFontSize = parseInt(itemSizeInput.value);
+    const itemColor = itemColorInput.value;
+
+    // Clear canvas
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    if(bgImage) ctx.drawImage(bgImage,0,0,canvas.width,canvas.height);
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    // Logo
+    let logoWidth=0, logoHeight=0;
+    if(logoImage){
+        logoWidth = logoSizeOption==='small'?60:logoSizeOption==='medium'?100:150;
+        logoHeight = (logoImage.height/logoImage.width)*logoWidth;
+    }
+
+    ctx.font = `bold ${headlineSize}px ${font}`;
+    let headlineWidth = ctx.measureText(headlineText).width;
+    const maxWidth = canvas.width - canvasPadding*2 - logoWidth;
+    while(headlineWidth>maxWidth && headlineSize>10){
+        headlineSize -= 2;
+        ctx.font = `bold ${headlineSize}px ${font}`;
+        headlineWidth = ctx.measureText(headlineText).width;
+    }
+
+    const headlineY = 120;
+    const totalWidth = headlineWidth + logoWidth;
+    const startX = (canvas.width - totalWidth)/2;
+    if(logoImage) ctx.drawImage(logoImage, startX, headlineY - logoHeight/2, logoWidth, logoHeight);
+    ctx.fillStyle = headlineColor;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign='left';
+    ctx.fillText(headlineText, startX + logoWidth, headlineY);
+
+    // Items in two columns with padding
+    const columnWidth = (canvas.width - canvasPadding*2)/2;
+    let x = canvasPadding, y = 250;
+    const margin = 20;
+
+    document.querySelectorAll('#items .item-container').forEach(div=>{
+        const name = div.querySelector('.itemName').value;
+        const price = div.querySelector('.itemPrice').value;
+        if(name.trim()!==''){
+            let text = `${name} - ${price}`;
+            let size = itemFontSize;
+            ctx.font=`bold ${size}px ${font}`;
+            ctx.fillStyle = itemColor;
+
+            while(ctx.measureText(text).width>columnWidth && size>10){
+                size-=2;
+                ctx.font=`bold ${size}px ${font}`;
+            }
+
+            if(y+size > canvas.height - canvasPadding){
+                y = 250;
+                x += columnWidth + margin;
+            }
+
+            ctx.fillText(text, x, y);
+            y += size + 10;
+        }
+    });
+}
+
+// Render & Download
+renderBtn.onclick=drawBillboard;
+downloadBtn.onclick=()=>{
+    drawBillboard();
+    const link=document.createElement('a');
+    link.download='stock-billboard.png';
+    link.href=canvas.toDataURL('image/png');
+    link.click();
+};
+
+// Live updates
+['logoSize','headlineText','fontSelect','textColor','bgColor'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', drawBillboard);
+    document.getElementById(id).addEventListener('change', drawBillboard);
+});
+
+headlineSizeInput.addEventListener('input',()=>{
+    headlineSizeSlider.value = headlineSizeInput.value;
+    drawBillboard();
+});
+headlineSizeSlider.addEventListener('input',()=>{
+    headlineSizeInput.value = headlineSizeSlider.value;
+    drawBillboard();
+});
+
+// Item settings sync
+itemSizeInput.addEventListener('input',()=>{
+    itemSizeSlider.value = itemSizeInput.value;
+    drawBillboard();
+});
+itemSizeSlider.addEventListener('input',()=>{
+    itemSizeInput.value = itemSizeSlider.value;
+    drawBillboard();
+});
+itemColorInput.addEventListener('input', drawBillboard);
+
+drawBillboard();
+</script>
+</body>
+</html>
